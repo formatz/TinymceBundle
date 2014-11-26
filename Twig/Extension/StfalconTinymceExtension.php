@@ -1,6 +1,7 @@
 <?php
 namespace Stfalcon\Bundle\TinymceBundle\Twig\Extension;
 
+use Stfalcon\Bundle\TinymceBundle\Helper\LocaleHelper;
 use Symfony\Component\DependencyInjection\ContainerInterface;
 
 /**
@@ -74,11 +75,13 @@ class StfalconTinymceExtension extends \Twig_Extension
     /**
      * TinyMce initializations
      *
+     * @param array $options
      * @return string
      */
-    public function tinymceInit()
+    public function tinymceInit($options = array())
     {
         $config = $this->getParameter('stfalcon_tinymce.config');
+        $config = array_merge_recursive($config, $options);
 
         $this->baseUrl = (!isset($config['base_url']) ? null : $config['base_url']);
         /** @var $assets \Symfony\Component\Templating\Helper\CoreAssetsHelper */
@@ -93,7 +96,17 @@ class StfalconTinymceExtension extends \Twig_Extension
 
         // Get local button's image
         foreach ($config['tinymce_buttons'] as &$customButton) {
-            $customButton['image'] = $this->getAssetsUrl($customButton['image']);
+            if ($customButton['image']) {
+                $customButton['image'] = $this->getAssetsUrl($customButton['image']);
+            } else {
+                unset($customButton['image']);
+            }
+
+            if ($customButton['icon']) {
+                $customButton['icon'] = $this->getAssetsUrl($customButton['icon']);
+            } else {
+                unset($customButton['icon']);
+            }
         }
 
         // Update URL to external plugins
@@ -107,29 +120,13 @@ class StfalconTinymceExtension extends \Twig_Extension
             $config['language'] = $this->getService('request')->getLocale();
         }
 
+        $config['language'] = LocaleHelper::getLanguage($config['language']);
+
         $langDirectory = __DIR__ . '/../../Resources/public/vendor/tinymce/langs/';
 
         // A language code coming from the locale may not match an existing language file
         if (!file_exists($langDirectory . $config['language'] . '.js')) {
-            // Try shortening the code
-            if (strlen($config['language']) > 2) {
-                $shortCode = substr($config['language'], 0, 2);
-
-                if (file_exists($langDirectory . $shortCode . '.js')) {
-                    $config['language'] = $shortCode;
-                } else {
-                    unset($config['language']);
-                }
-            } else {
-                // Try expanding the code
-                $longCode = $config['language'] . '_' . strtoupper($config['language']);
-
-                if (file_exists($langDirectory . $longCode . '.js')) {
-                    $config['language'] = $longCode;
-                } else {
-                    unset($config['language']);
-                }
-            }
+            unset($config['language']);
         }
 
         if (isset($config['language']) && $config['language']) {
@@ -139,8 +136,31 @@ class StfalconTinymceExtension extends \Twig_Extension
             }
         }
 
+        if (isset($config['theme']) && $config['theme'])
+        {
+            // Parse the content_css of each theme so we can use 'asset[path/to/asset]' in there
+            foreach ($config['theme'] as $themeName => $themeOptions) {
+                if(isset($themeOptions['content_css']))
+                {
+                    // As there may be multiple CSS Files specified we need to parse each of them individually
+                    $cssFiles = explode(',', $themeOptions['content_css']);
+
+                    foreach($cssFiles as $idx => $file)
+                    {
+                        $cssFiles[$idx] = $this->getAssetsUrl(trim($file)); // we trim to be sure we get the file without spaces.
+                    }
+
+                    // After parsing we add them together again.
+                    $config['theme'][$themeName]['content_css'] = implode(',', $cssFiles);
+                }
+            }
+        }
+
         return $this->getService('templating')->render('StfalconTinymceBundle:Script:init.html.twig', array(
-            'tinymce_config' => preg_replace('/"file_browser_callback":"([^"]+)"\s*/', 'file_browser_callback:$1', json_encode($config)),
+            'tinymce_config' => preg_replace(
+                '/"file_browser_callback":"([^"]+)"\s*/', 'file_browser_callback:$1',
+                json_encode($config)
+            ),
             'include_jquery' => $config['include_jquery'],
             'tinymce_jquery' => $config['tinymce_jquery'],
             'base_url'       => $this->baseUrl
@@ -156,7 +176,6 @@ class StfalconTinymceExtension extends \Twig_Extension
     {
         return 'stfalcon_tinymce';
     }
-
 
     /**
      * Get url from config string
