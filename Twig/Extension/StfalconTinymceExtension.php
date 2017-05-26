@@ -162,7 +162,7 @@ class StfalconTinymceExtension extends \Twig_Extension
                 json_encode($config)
             ),
             'include_jquery' => $config['include_jquery'],
-            'tinymce_jquery' => $config['tinymce_jquery'],
+            'tinymce_jquery' => false,
             'base_url'       => $this->baseUrl
         ));
     }
