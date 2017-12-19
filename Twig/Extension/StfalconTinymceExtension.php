@@ -68,7 +68,7 @@ class StfalconTinymceExtension extends \Twig_Extension
     public function getFunctions()
     {
         return array(
-            'tinymce_init' => new \Twig_Function_Method($this, 'tinymceInit', array('is_safe' => array('html')))
+            new \Twig_SimpleFunction('tinymce_init', [$this, 'tinymceInit'], array('is_safe' => array('html')))
         );
     }
 
@@ -198,4 +198,3 @@ class StfalconTinymceExtension extends \Twig_Extension
         return $inputUrl;
     }
 }
-
